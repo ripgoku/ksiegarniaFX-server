@@ -105,6 +105,53 @@ public class ClientHandler extends Thread{
                     return new Message(MessageType.SERVER_MESSAGE, "Błąd: " + e.getMessage());
                 }
             }
+            case ORDER_PRODUCT -> {
+                try {
+                    Order order = (Order) request.getData();
+
+                    databaseAnswer databaseAns = placeOrder(order);
+
+                    if (databaseAns == databaseAnswer.SUCCES) {
+                        return new Message(MessageType.SERVER_MESSAGE_SUCCES, "Złożono zamówienie.");
+                    } else if (databaseAns == databaseAnswer.ERROR) {
+                        return new Message(MessageType.SERVER_MESSAGE_ERROR, "Nie udało się złożyć zamówienia.");
+                    }
+                } catch (Exception e) {
+                    return new Message(MessageType.SERVER_MESSAGE_ERROR, "Błąd: " + e.getMessage());
+                }
+            }
+            case UPDATE_USER_DETAILS -> {
+                try {
+                    UserData userData = (UserData) request.getData();
+
+                    databaseAnswer databaseAns = updateUser(userData);
+
+                    if (databaseAns == databaseAnswer.SUCCES) {
+                        return new Message(MessageType.SERVER_MESSAGE_SUCCES, "Zmieniono dane.");
+                    } else if (databaseAns == databaseAnswer.ERROR) {
+                        return new Message(MessageType.SERVER_MESSAGE_ERROR, "Nie udało się zmienić danych.");
+                    }
+                } catch (Exception e) {
+                    return new Message(MessageType.SERVER_MESSAGE_ERROR, "Błąd: " + e.getMessage());
+                }
+            }
+            case UPDATE_PASSWORD -> {
+                try {
+                    PasswordData passwordData = (PasswordData) request.getData();
+
+                    databaseAnswer databaseAns = updatePassword(passwordData);
+
+                    if (databaseAns == databaseAnswer.SUCCES) {
+                        return new Message(MessageType.SERVER_MESSAGE_SUCCES, "Zmieniono hasło.");
+                    } else if (databaseAns == databaseAnswer.ERROR) {
+                        return new Message(MessageType.SERVER_MESSAGE_ERROR, "Nie udało się zmienić hasła.");
+                    } else if (databaseAns == databaseAnswer.PASSWORD_ERROR_WRONG) {
+                        return new Message(MessageType.SERVER_MESSAGE_ERROR, "Błędne stare hasło!");
+                    }
+                } catch (Exception e) {
+                    return new Message(MessageType.SERVER_MESSAGE_ERROR, "Błąd: " + e.getMessage());
+                }
+            }
         }
         return null;
     }

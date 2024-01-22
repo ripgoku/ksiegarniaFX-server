@@ -1,13 +1,13 @@
 package com.bookstore.server;
 
-import com.bookstore.Book;
-import com.bookstore.LoginData;
-import com.bookstore.RegistrationData;
-import com.bookstore.UserData;
+import com.bookstore.*;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.*;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 public class DataBase {
     final private static String url = "jdbc:mysql://localhost:3306/bookstore_project";
@@ -176,7 +176,7 @@ public class DataBase {
 
             psGetUserData = connection.prepareStatement("SELECT customer.customer_id, address.address_id, " +
                     "customer.first_name, customer.last_name, address.city, " +
-                    "address.street_name, address.postal_code, address.street_number " +
+                    "address.street_name, address.postal_code, address.street_number, customer.email " +
                     "FROM customer JOIN address ON customer.address_id = address.address_id " +
                     "WHERE user_id = ?");
             psGetUserData.setInt(1, user_id);
@@ -190,6 +190,8 @@ public class DataBase {
                 userData.setStreet(resultSet.getString(6));
                 userData.setPostalCode(resultSet.getString(7));
                 userData.setHouseNumber(resultSet.getString(8));
+                userData.setEmail(resultSet.getString(9));
+                userData.setLogin(login);
                 System.out.println("Zalogowano użytkownika: " + login);
             } else if (!resultSet.isBeforeFirst()) {
                 System.out.println("Błąd przy logowaniu. Nie można odnaleźć klienta!");
@@ -291,6 +293,214 @@ public class DataBase {
             }
             if (psBooks != null) {
                 psBooks.close();
+            }
+            if (connection != null) {
+                connection.close();
+            }
+        }
+        return databaseAnswer.SUCCES;
+    }
+
+    public static databaseAnswer placeOrder(Order order)
+            throws SQLException {
+        int orderId = 0;
+        int customerId = order.getUserId();
+        int addressId = order.getAddressId();
+        int shippingMethodId = order.getShippingMethod().getMethod_id();
+        Map<Book, Integer> books = order.getItems();
+
+        Connection connection = null;
+        PreparedStatement psInsertOrder = null;
+        PreparedStatement psInsertOrderLine = null;
+        PreparedStatement psInsertOrderHistory = null;
+        ResultSet resultSet = null;
+
+        try {
+            connection = getConnection();
+            connection.setAutoCommit(false);  // Start transaction
+
+            // Sprawdzenie, czy użytkownik już istnieje
+            psInsertOrder = connection.prepareStatement(
+                    "INSERT INTO cust_order (order_date, customer_id, shipping_method_id, dest_address_id) VALUES (NOW(), ?, ?, ?)",
+                    Statement.RETURN_GENERATED_KEYS);
+            psInsertOrder.setInt(1, customerId);
+            psInsertOrder.setInt(2, shippingMethodId);
+            psInsertOrder.setInt(3, addressId);
+            psInsertOrder.executeUpdate();
+
+            // Pobranie wygenerowanego ID zamówienia
+            resultSet = psInsertOrder.getGeneratedKeys();
+            if (resultSet.next()) {
+                orderId = resultSet.getInt(1);
+            }
+
+            psInsertOrderLine = connection.prepareStatement(
+                    "INSERT INTO order_line (order_id, book_id, quantity, price) VALUES (?, ?, ?, ?)");
+            for (Map.Entry<Book, Integer> entry : books.entrySet()) {
+                BigDecimal price = BigDecimal.valueOf(entry.getKey().getPrice())
+                        .multiply(BigDecimal.valueOf(entry.getValue()))
+                        .setScale(2, RoundingMode.HALF_UP);
+                psInsertOrderLine.setInt(1, orderId);
+                psInsertOrderLine.setInt(2, entry.getKey().getBook_id());
+                psInsertOrderLine.setInt(3, entry.getValue());
+                psInsertOrderLine.setBigDecimal(4, price);
+                psInsertOrderLine.executeUpdate();
+            }
+
+            psInsertOrderHistory = connection.prepareStatement(
+                    "INSERT INTO order_history (order_id, status_id, status_date) VALUES (?, ?, NOW())");
+            psInsertOrderHistory.setInt(1, orderId);
+            psInsertOrderHistory.setInt(2, 1);
+            psInsertOrderHistory.executeUpdate();
+            System.out.println("Złożono zamówienie.");
+
+            connection.commit();  // Zatwierdzenie transakcji
+        } catch (SQLException ex) {
+            if (connection != null) {
+                try {
+                    connection.rollback();  // Wycofanie transakcji w przypadku błędu
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
+            throw ex;
+        } finally {
+            if (resultSet != null) {
+                resultSet.close();
+            }
+            if (psInsertOrder != null) {
+                psInsertOrder.close();
+            }
+            if (psInsertOrderLine != null) {
+                psInsertOrderLine.close();
+            }
+            if (psInsertOrderHistory != null) {
+                psInsertOrderHistory.close();
+            }
+            if (connection != null) {
+                connection.close();
+            }
+        }
+        return databaseAnswer.SUCCES;
+    }
+
+    public static databaseAnswer updateUser(UserData userData)
+            throws SQLException {
+        String firstName = userData.getFirst_name();
+        String lastName = userData.getLast_name();
+        String email = userData.getEmail();
+        String login = userData.getLogin();
+        String city = userData.getCity();
+        String postalCode = userData.getPostalCode();
+        String street = userData.getStreet();
+        String houseNumber = userData.getHouseNumber();
+        int customerId = userData.getCustomer_id();
+        int addressId = userData.getAdres_id();
+
+        Connection connection = null;
+        PreparedStatement psUpdateCustomer = null;
+        PreparedStatement psUpdateAddress = null;
+        int affectedRows = 0;
+
+        try {
+            connection = getConnection();
+            connection.setAutoCommit(false);  // Start transaction
+
+            // Sprawdzenie, czy użytkownik już istnieje
+            psUpdateCustomer = connection.prepareStatement("UPDATE customer SET first_name = ?, last_name = ?, email = ? WHERE customer_id = ?");
+            psUpdateCustomer.setString(1, firstName);
+            psUpdateCustomer.setString(2, lastName);
+            psUpdateCustomer.setString(3, email);
+            psUpdateCustomer.setInt(4, customerId);
+            affectedRows = psUpdateCustomer.executeUpdate();
+            if (affectedRows <= 0) {
+                return databaseAnswer.ERROR;
+            }
+            affectedRows = 0;
+
+            psUpdateAddress = connection.prepareStatement("UPDATE address SET street_number = ?, street_name = ?, city = ?, postal_code = ? WHERE address_id = ?");
+            psUpdateAddress.setString(1, houseNumber);
+            psUpdateAddress.setString(2, street);
+            psUpdateAddress.setString(3, city);
+            psUpdateAddress.setString(4, postalCode);
+            psUpdateAddress.setInt(5, addressId);
+            affectedRows = psUpdateAddress.executeUpdate();
+            if (affectedRows <= 0) {
+                return databaseAnswer.ERROR;
+            }
+
+            connection.commit();  // Zatwierdzenie transakcji
+        } catch (SQLException ex) {
+            if (connection != null) {
+                try {
+                    connection.rollback();  // Wycofanie transakcji w przypadku błędu
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
+            throw ex;
+        } finally {
+            if (psUpdateAddress != null) {
+                psUpdateAddress.close();
+            }
+            if (psUpdateCustomer != null) {
+                psUpdateCustomer.close();
+            }
+            if (connection != null) {
+                connection.close();
+            }
+        }
+        return databaseAnswer.SUCCES;
+    }
+
+    public static databaseAnswer updatePassword(PasswordData passwordData)
+            throws SQLException {
+        String login = passwordData.getLogin();
+        String oldPassword = passwordData.getOldPassword();
+        String newPassword = passwordData.getNewPassword();
+
+        Connection connection = null;
+        PreparedStatement psCheckPassword = null;
+        PreparedStatement psUpdatePassword = null;
+        ResultSet resultSet = null;
+        int affectedRows = 0;
+
+        try {
+            connection = getConnection();
+            connection.setAutoCommit(false);  // Start transaction
+
+            psCheckPassword = connection.prepareStatement("SELECT * FROM login_details WHERE login = ? AND password = ?");
+            psCheckPassword.setString(1, login);
+            psCheckPassword.setString(2, oldPassword);
+            resultSet = psCheckPassword.executeQuery();
+            if (!resultSet.isBeforeFirst()) {
+                return databaseAnswer.PASSWORD_ERROR_WRONG;
+            }
+
+            psUpdatePassword = connection.prepareStatement("UPDATE login_details SET password = ? WHERE login = ?");
+            psUpdatePassword.setString(1, newPassword);
+            psUpdatePassword.setString(2, login);
+            affectedRows = psUpdatePassword.executeUpdate();
+            if (affectedRows <= 0) {
+                return databaseAnswer.ERROR;
+            }
+
+            connection.commit();  // Zatwierdzenie transakcji
+        } catch (SQLException ex) {
+            if (connection != null) {
+                try {
+                    connection.rollback();  // Wycofanie transakcji w przypadku błędu
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
+            throw ex;
+        } finally {
+            if (psCheckPassword != null) {
+                psCheckPassword.close();
+            }
+            if (psUpdatePassword != null) {
+                psUpdatePassword.close();
             }
             if (connection != null) {
                 connection.close();
