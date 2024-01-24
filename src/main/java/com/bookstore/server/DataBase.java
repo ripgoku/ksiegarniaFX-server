@@ -9,11 +9,20 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Klasa DataBase odpowiada za zarządzanie połączeniem z bazą danych oraz wykonanie podstawowych operacji CRUD
+ * na tabelach związanych z projektowym sklepem książek. Umożliwia rejestrację i logowanie użytkowników,
+ * pobieranie danych książek, zarządzanie zamówieniami, aktualizację danych użytkowników i zmianę hasła.
+ */
 public class DataBase {
+    // Stałe przechowujące dane do połączenia z bazą danych
     final private static String url = "jdbc:mysql://localhost:3306/bookstore_project";
     final private static String user = "root";
     final private static String password = "root123";
 
+    /**
+     * Konstruktor klasy DataBase. Inicjalizuje sterownik JDBC i ustanawia połączenie z bazą danych.
+     */
     public DataBase() {
         try {
             Class.forName("com.mysql.cj.jdbc.Driver");
@@ -25,10 +34,23 @@ public class DataBase {
         }
     }
 
+    /**
+     * Uzyskuje połączenie z bazą danych.
+     *
+     * @return Połączenie z bazą danych.
+     * @throws SQLException W przypadku problemów z połączeniem.
+     */
     public static Connection getConnection() throws SQLException {
         return DriverManager.getConnection(url, user, password);
     }
 
+    /**
+     * Rejestruje nowego użytkownika w systemie.
+     *
+     * @param newUser Dane rejestracyjne użytkownika.
+     * @return Status operacji rejestracji.
+     * @throws SQLException W przypadku problemów z bazą danych.
+     */
     public static databaseAnswer registerUser(RegistrationData newUser)
             throws SQLException {
         String firstName = newUser.getFirstName();
@@ -50,9 +72,8 @@ public class DataBase {
 
         try {
             connection = getConnection();
-            connection.setAutoCommit(false);  // Start transaction
+            connection.setAutoCommit(false);
 
-            // Sprawdzenie, czy użytkownik już istnieje
             psCheckUserExists = connection.prepareStatement("SELECT * FROM customer WHERE email = ?");
             psCheckUserExists.setString(1, email);
             resultSet = psCheckUserExists.executeQuery();
@@ -68,7 +89,6 @@ public class DataBase {
                 return databaseAnswer.REGISTER_ERROR_LOGIN;
             }
 
-            // Dodanie danych do tabeli login_details
             psInsertLoginDetails = connection.prepareStatement("INSERT INTO login_details (login, password) VALUES (?, ?)", Statement.RETURN_GENERATED_KEYS);
             psInsertLoginDetails.setString(1, login);
             psInsertLoginDetails.setString(2, password);
@@ -87,7 +107,6 @@ public class DataBase {
                 }
             }
 
-            // Dodanie adresu do tabeli address
             psInsertAddress = connection.prepareStatement("INSERT INTO address (street_number, street_name, city, postal_code) VALUES (?, ?, ?, ?)", Statement.RETURN_GENERATED_KEYS);
             psInsertAddress.setString(1, streetNumber);
             psInsertAddress.setString(2, streetName);
@@ -104,7 +123,6 @@ public class DataBase {
                 }
             }
 
-            // Dodanie klienta do tabeli customer
             psInsertCustomer = connection.prepareStatement("INSERT INTO customer (first_name, last_name, email, user_id, address_id) VALUES (?, ?, ?, ?, ?)");
             psInsertCustomer.setString(1, firstName);
             psInsertCustomer.setString(2, lastName);
@@ -113,12 +131,12 @@ public class DataBase {
             psInsertCustomer.setInt(5, addressId);
             psInsertCustomer.executeUpdate();
 
-            connection.commit();  // Zatwierdzenie transakcji
+            connection.commit();
 
         } catch (SQLException ex) {
             if (connection != null) {
                 try {
-                    connection.rollback();  // Wycofanie transakcji w przypadku błędu
+                    connection.rollback();
                 } catch (SQLException e) {
                     e.printStackTrace();
                 }
@@ -147,6 +165,14 @@ public class DataBase {
         return databaseAnswer.SUCCES;
     }
 
+    /**
+     * Loguje użytkownika do systemu.
+     *
+     * @param user     Dane logowania użytkownika.
+     * @param userData Dane użytkownika do wypełnienia.
+     * @return Status operacji logowania.
+     * @throws SQLException W przypadku problemów z bazą danych.
+     */
     public static databaseAnswer loginUser(LoginData user, UserData userData)
             throws SQLException {
         String login = user.getLogin();
@@ -160,9 +186,8 @@ public class DataBase {
 
         try {
             connection = getConnection();
-            connection.setAutoCommit(false);  // Start transaction
+            connection.setAutoCommit(false);
 
-            // Sprawdzenie, czy użytkownik już istnieje
             psLoginUser = connection.prepareStatement("SELECT * FROM login_details WHERE login = ? AND password = ?");
             psLoginUser.setString(1, login);
             psLoginUser.setString(2, password);
@@ -198,11 +223,11 @@ public class DataBase {
                 return databaseAnswer.ERROR;
             }
 
-            connection.commit();  // Zatwierdzenie transakcji
+            connection.commit();
         } catch (SQLException ex) {
             if (connection != null) {
                 try {
-                    connection.rollback();  // Wycofanie transakcji w przypadku błędu
+                    connection.rollback();
                 } catch (SQLException e) {
                     e.printStackTrace();
                 }
@@ -225,6 +250,13 @@ public class DataBase {
         return databaseAnswer.SUCCES;
     }
 
+    /**
+     * Pobiera listę książek z bazy danych.
+     *
+     * @param books Lista, do której zostaną dodane pobrane książki.
+     * @return Status operacji pobierania książek.
+     * @throws SQLException W przypadku problemów z bazą danych.
+     */
     public static databaseAnswer getBooks(List<Book> books)
             throws SQLException{
         Connection connection = null;
@@ -233,9 +265,8 @@ public class DataBase {
 
         try {
             connection = getConnection();
-            connection.setAutoCommit(false);  // Start transaction
+            connection.setAutoCommit(false);
 
-            // Sprawdzenie, czy użytkownik już istnieje
             psBooks = connection.prepareStatement("SELECT book.title, book.isbn13, " +
                     "GROUP_CONCAT(DISTINCT author.author_name SEPARATOR '; ') AS authors, " +
                     "book_language.language_name, book.num_pages, " +
@@ -277,11 +308,11 @@ public class DataBase {
             }
             System.out.println("Pobrano asortyment książek.");
 
-            connection.commit();  // Zatwierdzenie transakcji
+            connection.commit();
         } catch (SQLException ex) {
             if (connection != null) {
                 try {
-                    connection.rollback();  // Wycofanie transakcji w przypadku błędu
+                    connection.rollback();
                 } catch (SQLException e) {
                     e.printStackTrace();
                 }
@@ -301,6 +332,13 @@ public class DataBase {
         return databaseAnswer.SUCCES;
     }
 
+    /**
+     * Rejestruje zamówienie w systemie.
+     *
+     * @param order Dane zamówienia do zarejestrowania.
+     * @return Status operacji rejestracji zamówienia.
+     * @throws SQLException W przypadku problemów z bazą danych.
+     */
     public static databaseAnswer placeOrder(Order order)
             throws SQLException {
         int orderId = 0;
@@ -317,9 +355,8 @@ public class DataBase {
 
         try {
             connection = getConnection();
-            connection.setAutoCommit(false);  // Start transaction
+            connection.setAutoCommit(false);
 
-            // Sprawdzenie, czy użytkownik już istnieje
             psInsertOrder = connection.prepareStatement(
                     "INSERT INTO cust_order (order_date, customer_id, shipping_method_id, dest_address_id) VALUES (NOW(), ?, ?, ?)",
                     Statement.RETURN_GENERATED_KEYS);
@@ -328,7 +365,6 @@ public class DataBase {
             psInsertOrder.setInt(3, addressId);
             psInsertOrder.executeUpdate();
 
-            // Pobranie wygenerowanego ID zamówienia
             resultSet = psInsertOrder.getGeneratedKeys();
             if (resultSet.next()) {
                 orderId = resultSet.getInt(1);
@@ -354,11 +390,11 @@ public class DataBase {
             psInsertOrderHistory.executeUpdate();
             System.out.println("Złożono zamówienie.");
 
-            connection.commit();  // Zatwierdzenie transakcji
+            connection.commit();
         } catch (SQLException ex) {
             if (connection != null) {
                 try {
-                    connection.rollback();  // Wycofanie transakcji w przypadku błędu
+                    connection.rollback();
                 } catch (SQLException e) {
                     e.printStackTrace();
                 }
@@ -384,6 +420,13 @@ public class DataBase {
         return databaseAnswer.SUCCES;
     }
 
+    /**
+     * Aktualizuje dane użytkownika w systemie.
+     *
+     * @param userData Zaktualizowane dane użytkownika.
+     * @return Status operacji aktualizacji danych.
+     * @throws SQLException W przypadku problemów z bazą danych.
+     */
     public static databaseAnswer updateUser(UserData userData)
             throws SQLException {
         String firstName = userData.getFirst_name();
@@ -404,9 +447,8 @@ public class DataBase {
 
         try {
             connection = getConnection();
-            connection.setAutoCommit(false);  // Start transaction
+            connection.setAutoCommit(false);
 
-            // Sprawdzenie, czy użytkownik już istnieje
             psUpdateCustomer = connection.prepareStatement("UPDATE customer SET first_name = ?, last_name = ?, email = ? WHERE customer_id = ?");
             psUpdateCustomer.setString(1, firstName);
             psUpdateCustomer.setString(2, lastName);
@@ -429,11 +471,11 @@ public class DataBase {
                 return databaseAnswer.ERROR;
             }
 
-            connection.commit();  // Zatwierdzenie transakcji
+            connection.commit();
         } catch (SQLException ex) {
             if (connection != null) {
                 try {
-                    connection.rollback();  // Wycofanie transakcji w przypadku błędu
+                    connection.rollback();
                 } catch (SQLException e) {
                     e.printStackTrace();
                 }
@@ -453,6 +495,13 @@ public class DataBase {
         return databaseAnswer.SUCCES;
     }
 
+    /**
+     * Aktualizuje hasło użytkownika w systemie.
+     *
+     * @param passwordData Dane do zmiany hasła.
+     * @return Status operacji zmiany hasła.
+     * @throws SQLException W przypadku problemów z bazą danych.
+     */
     public static databaseAnswer updatePassword(PasswordData passwordData)
             throws SQLException {
         String login = passwordData.getLogin();
@@ -467,7 +516,7 @@ public class DataBase {
 
         try {
             connection = getConnection();
-            connection.setAutoCommit(false);  // Start transaction
+            connection.setAutoCommit(false);
 
             psCheckPassword = connection.prepareStatement("SELECT * FROM login_details WHERE login = ? AND password = ?");
             psCheckPassword.setString(1, login);
@@ -485,11 +534,11 @@ public class DataBase {
                 return databaseAnswer.ERROR;
             }
 
-            connection.commit();  // Zatwierdzenie transakcji
+            connection.commit();
         } catch (SQLException ex) {
             if (connection != null) {
                 try {
-                    connection.rollback();  // Wycofanie transakcji w przypadku błędu
+                    connection.rollback();
                 } catch (SQLException e) {
                     e.printStackTrace();
                 }

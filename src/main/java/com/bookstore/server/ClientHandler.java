@@ -10,11 +10,21 @@ import java.util.List;
 
 import static com.bookstore.server.DataBase.*;
 
+/**
+ * Klasa ClientHandler odpowiada za obsługę komunikacji między klientem a serwerem w kontekście sklepu książek.
+ * Przetwarza żądania od klienta, wykonuje odpowiednie operacje na bazie danych i zwraca odpowiedzi do klienta.
+ */
 public class ClientHandler extends Thread{
+    // Pola klasy
     final Socket socket;
     private ObjectInputStream objectInputStream;
     private ObjectOutputStream objectOutputStream;
 
+    /**
+     * Konstruktor ClientHandler inicjalizuje strumienie danych i ustawia gniazdo do komunikacji.
+     *
+     * @param socket Gniazdo połączenia z klientem.
+     */
     public ClientHandler(Socket socket) {
         this.socket = socket;
         try {
@@ -25,6 +35,9 @@ public class ClientHandler extends Thread{
         }
     }
 
+    /**
+     * Metoda run uruchamiana przez wątek, służy do ciągłej obsługi komunikacji z klientem.
+     */
     @Override
     public void run() {
         try {
@@ -51,6 +64,12 @@ public class ClientHandler extends Thread{
         }
     }
 
+    /**
+     * Przetwarza otrzymane żądanie od klienta i generuje odpowiedź.
+     *
+     * @param request Żądanie od klienta.
+     * @return Odpowiedź do wysłania do klienta.
+     */
     private Message processRequest(Message request) {
         switch (request.getType())
         {
@@ -155,6 +174,4 @@ public class ClientHandler extends Thread{
         }
         return null;
     }
-
-
 }
